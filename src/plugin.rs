@@ -9,9 +9,7 @@ use time_tracker_plugin_sdk::{
     PluginAPIInterface,
     EntityType,
     SchemaChange,
-    ModelField,
-    ForeignKey,
-    SchemaExtension,
+    extensions::{SchemaExtension, TableColumn},
 };
 use serde_json;
 
@@ -51,7 +49,7 @@ impl Plugin for ExamplePlugin {
                 SchemaChange::CreateTable {
                     table: "example_plugin_data".to_string(),
                     columns: vec![
-                        time_tracker_plugin_sdk::TableColumn {
+                        TableColumn {
                             name: "id".to_string(),
                             column_type: "INTEGER".to_string(),
                             primary_key: true,
@@ -59,7 +57,7 @@ impl Plugin for ExamplePlugin {
                             default: None,
                             foreign_key: None,
                         },
-                        time_tracker_plugin_sdk::TableColumn {
+                        TableColumn {
                             name: "key".to_string(),
                             column_type: "TEXT".to_string(),
                             primary_key: false,
@@ -67,7 +65,7 @@ impl Plugin for ExamplePlugin {
                             default: None,
                             foreign_key: None,
                         },
-                        time_tracker_plugin_sdk::TableColumn {
+                        TableColumn {
                             name: "value".to_string(),
                             column_type: "TEXT".to_string(),
                             primary_key: false,
@@ -75,7 +73,7 @@ impl Plugin for ExamplePlugin {
                             default: None,
                             foreign_key: None,
                         },
-                        time_tracker_plugin_sdk::TableColumn {
+                        TableColumn {
                             name: "created_at".to_string(),
                             column_type: "INTEGER".to_string(),
                             primary_key: false,

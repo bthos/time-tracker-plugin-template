@@ -8,7 +8,7 @@
 //! 3. Implement the Plugin trait in src/plugin.rs
 //! 4. Export the _plugin_create and _plugin_destroy functions from this file
 
-use time_tracker_plugin_sdk::{Plugin, PluginInfo};
+use time_tracker_plugin_sdk::Plugin;
 
 // Import the plugin implementation
 mod plugin;
@@ -30,6 +30,9 @@ pub extern "C" fn _plugin_create() -> *mut dyn Plugin {
 /// This function must be exported with the exact name specified in plugin.toml
 #[no_mangle]
 pub extern "C" fn _plugin_destroy(plugin: *mut dyn Plugin) {
+    if plugin.is_null() {
+        return;
+    }
     unsafe {
         let _ = Box::from_raw(plugin);
     }
