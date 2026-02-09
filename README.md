@@ -1,6 +1,6 @@
 # TimeTracker Plugin Template
 
-A template repository for creating plugins for the [TimeTracker](https://github.com/bthos/time-tracker-app) application.
+A template repository for creating plugins for the [TimeTracker](https://github.com/tmtrckr/time-tracker-app) application.
 
 ## Overview
 
@@ -10,6 +10,7 @@ This template provides a complete foundation for building TimeTracker plugins, i
 - **React Frontend**: UI components that can be embedded in TimeTracker's interface
 - **Build System**: GitHub Actions workflow for automated cross-platform builds
 - **Plugin Manifest**: TOML configuration file defining plugin metadata
+- **Extension API**: Extend Core entities (activities, manual_entries, categories) with custom fields
 
 ## Quick Start
 
@@ -18,7 +19,7 @@ This template provides a complete foundation for building TimeTracker plugins, i
 Click "Use this template" on GitHub to create your own plugin repository, or:
 
 ```bash
-git clone https://github.com/your-org/time-tracker-plugin-template.git my-plugin
+git clone https://github.com/tmtrckr/plugin-template.git my-plugin
 cd my-plugin
 rm -rf .git
 git init
@@ -30,16 +31,16 @@ Edit `plugin.toml` with your plugin information:
 
 ```toml
 [plugin]
-name = "my-plugin"                    # Unique plugin ID
+name = "my-plugin"                    # Unique plugin ID (must match registry entry)
 display_name = "My Plugin"            # Display name
 version = "1.0.0"
-author = "Your Name"
+author = "Your Name"                  # Required: Plugin author (must match normalized author name in registry)
 description = "Description of your plugin"
 repository = "https://github.com/your-username/my-plugin"
 license = "MIT"
 api_version = "1.0"
-min_core_version = "0.3.0"
-max_core_version = "1.0.0"
+min_core_version = "0.3.0"           # Minimum required TimeTracker version
+max_core_version = "1.0.0"           # Maximum supported TimeTracker version
 ```
 
 ### 3. Update Cargo.toml
@@ -63,18 +64,26 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 ```
 
-**Important**: The SDK dependency is already included in the template. Make sure to use the same version that matches your target TimeTracker version.
+**Important**: The SDK dependency is already included in the template. Make sure to use the same version that matches your target TimeTracker version. The SDK is published on [crates.io](https://crates.io/crates/time-tracker-plugin-sdk).
+
+For development alongside the main app, you can use a local path:
+```toml
+time-tracker-plugin-sdk = { path = "../time-tracker-app/plugin-sdk" }
+```
 
 ### 4. Update plugin.toml Backend Section
 
-Make sure the backend section matches your Cargo.toml:
+The backend section specifies the compiled library filename:
 
 ```toml
 [backend]
-crate_name = "my-plugin"              # Must match Cargo.toml [package].name
-library_name = "my_plugin_backend"    # Must match Cargo.toml [lib].name
-entry_point = "_plugin_create"        # Must match exported function in lib.rs
+library_name = "my_plugin_backend"    # Library filename (without extension, e.g., "my_plugin_backend.dll" on Windows)
 ```
+
+**Note**: 
+- The `library_name` should match your actual compiled library filename
+- The entry point function is always `_plugin_create` (hardcoded in the loader)
+- The loader will search for library files if `library_name` doesn't match exactly
 
 ### 5. Implement Your Plugin
 
@@ -145,7 +154,7 @@ pub extern "C" fn _plugin_destroy(plugin: *mut dyn Plugin) {
 # Build Rust backend
 cargo build --release
 
-# Build frontend
+# Build frontend (if you have frontend components)
 cd frontend
 npm install
 npm run build
@@ -167,7 +176,7 @@ time-tracker-plugin-template/
 │   └── workflows/
 │       └── build.yml              # CI/CD workflow for building plugins
 ├── src/
-│   ├── lib.rs                    # Plugin trait and API definitions
+│   ├── lib.rs                    # FFI exports (_plugin_create, _plugin_destroy)
 │   └── plugin.rs                 # Your plugin implementation
 ├── frontend/
 │   ├── src/
@@ -176,7 +185,7 @@ time-tracker-plugin-template/
 │   ├── vite.config.ts
 │   └── tsconfig.json
 ├── migrations/
-│   └── 001_initial.sql          # Database migrations
+│   └── 001_initial.sql          # Database migrations (optional)
 ├── plugin.toml                   # Plugin manifest
 ├── Cargo.toml                    # Rust dependencies
 ├── .gitignore
@@ -189,24 +198,24 @@ The `plugin.toml` file defines your plugin's metadata and configuration:
 
 ### [plugin] Section
 
-- `name`: Unique identifier for your plugin (used in URLs and internal references)
-- `display_name`: Human-readable name shown in the UI
-- `version`: Semantic version (e.g., "1.0.0")
-- `author`: Plugin author name
+- `name`: Unique identifier for your plugin (used in URLs and internal references, must match registry entry `id`)
+- `display_name`: Human-readable name shown in the UI (maps to registry `name` field)
+- `version`: Semantic version (e.g., "1.0.0", maps to registry `latest_version`)
+- `author`: Plugin author name (required, must match normalized author name in registry)
 - `description`: Brief description of what your plugin does
-- `repository`: GitHub repository URL
-- `license`: License identifier (MIT, Apache-2.0, etc.)
-- `api_version`: Plugin API version your plugin targets
-- `min_core_version`: Minimum TimeTracker version required
-- `max_core_version`: Maximum TimeTracker version supported
+- `repository`: GitHub repository URL (must be a valid GitHub repository)
+- `license`: License identifier (MIT, Apache-2.0, etc., SPDX format)
+- `api_version`: Plugin API version your plugin targets (currently "1.0")
+- `min_core_version`: Minimum TimeTracker version required (e.g., "0.3.0")
+- `max_core_version`: Maximum supported TimeTracker version (e.g., "1.0.0")
 
 ### [backend] Section
 
-- `crate_name`: Rust crate name (must match `Cargo.toml` `[package].name`)
-- `library_name`: Name of the compiled library (must match `Cargo.toml` `[lib].name`)
-- `entry_point`: Function name exported from lib.rs (must be `_plugin_create`)
+- `library_name`: Name of the compiled library file (used to locate the library, e.g., `"my_plugin_backend"` for `my_plugin_backend.dll` on Windows)
+  - The loader will search for library files if this doesn't match exactly
+  - Entry point function is always `_plugin_create` (hardcoded in the loader)
 
-### [frontend] Section
+### [frontend] Section (Optional)
 
 - `entry`: Path to compiled JavaScript bundle
 - `components`: List of React component names to export
@@ -275,38 +284,11 @@ pub trait PluginAPIInterface: Send + Sync {
 }
 ```
 
-### Lifecycle
-
-- **`initialize`**: Called when the plugin is first loaded. Use this to register extensions and set up your plugin.
-- **`invoke_command`**: Called when a command is invoked on your plugin. Handle your plugin's commands here.
-- **`shutdown`**: Called when the plugin is unloaded. Clean up any resources here.
-
-## Frontend Components
-
-Export React components from `frontend/src/index.tsx`:
-
-```tsx
-export const MySettings: React.FC = () => {
-  return <div>Plugin Settings UI</div>;
-};
-
-export default {
-  MySettings,
-};
-```
-
-List exported components in `plugin.toml`:
-
-```toml
-[frontend]
-components = ["MySettings"]
-```
-
-## Extension API
+### Extension API
 
 Plugins can extend Core entities (activities, manual_entries, categories) using the Extension API:
 
-### 1. Database Schema Extensions
+#### 1. Database Schema Extensions
 
 Add columns to Core tables or create new tables:
 
@@ -337,11 +319,17 @@ api.register_schema_extension(
             default: None,
             foreign_key: None,
         },
+        // Add an index
+        SchemaChange::AddIndex {
+            table: "activities".to_string(),
+            index: "idx_activities_custom_field".to_string(),
+            columns: vec!["custom_field".to_string()],
+        },
     ],
 )?;
 ```
 
-### 2. Model Extensions
+#### 2. Model Extensions
 
 Add fields to Core data structures:
 
@@ -358,7 +346,53 @@ api.register_model_extension(
 )?;
 ```
 
-### 3. Database Operations
+#### 3. Query Filters
+
+Add custom query filters for activities:
+
+```rust
+api.register_query_filters(
+    EntityType::Activity,
+    vec![
+        QueryFilter {
+            name: "by_custom_field".to_string(),
+            filter_fn: Box::new(|activities, params| {
+                // Filter logic
+                Ok(activities)
+            }),
+        },
+    ],
+)?;
+```
+
+### Lifecycle
+
+- **`initialize`**: Called when the plugin is first loaded. Use this to register extensions and set up your plugin.
+- **`invoke_command`**: Called when a command is invoked on your plugin. Handle your plugin's commands here.
+- **`shutdown`**: Called when the plugin is unloaded. Clean up any resources here.
+
+## Frontend Components
+
+Export React components from `frontend/src/index.tsx`:
+
+```tsx
+export const MySettings: React.FC = () => {
+  return <div>Plugin Settings UI</div>;
+};
+
+export default {
+  MySettings,
+};
+```
+
+List exported components in `plugin.toml`:
+
+```toml
+[frontend]
+components = ["MySettings"]
+```
+
+## Database Operations
 
 Plugins can interact with the database through the `call_db_method` API:
 
@@ -415,6 +449,31 @@ cargo build --release --target x86_64-unknown-linux-gnu
 5. Create a GitHub Release with the same tag
 6. GitHub Actions will automatically build and attach artifacts
 
+### Registering Your Plugin
+
+To make your plugin discoverable in the Time Tracker Marketplace:
+
+1. **Ensure your plugin meets requirements**:
+   - Plugin must be hosted on GitHub
+   - Repository must have a `plugin.toml` manifest file
+   - Plugin must have at least one GitHub Release with compiled binaries
+
+2. **Add your plugin to the registry**:
+   - Fork the [Plugins Registry](https://github.com/tmtrckr/plugins-registry) repository
+   - Use the interactive script: `npm run create-plugin` (recommended)
+   - Or manually create a `plugin.json` entry following the registry structure
+   - Submit a pull request to the registry
+
+3. **Registry fields mapping**:
+   - `plugin.toml` `name` → registry `id`
+   - `plugin.toml` `display_name` → registry `name`
+   - `plugin.toml` `version` → registry `latest_version`
+   - `plugin.toml` `author` → registry `author` (required, must match normalized author directory name)
+   - `plugin.toml` `min_core_version` → registry `min_core_version`
+   - `plugin.toml` `max_core_version` → registry `max_core_version`
+
+See the [Plugins Registry README](https://github.com/tmtrckr/plugins-registry) for detailed instructions.
+
 ## Testing Your Plugin
 
 ### Local Testing
@@ -424,7 +483,7 @@ cargo build --release --target x86_64-unknown-linux-gnu
    - Windows: `%APPDATA%\timetracker\plugins\your-plugin-name\`
    - macOS: `~/Library/Application Support/timetracker/plugins/your-plugin-name/`
    - Linux: `~/.local/share/timetracker/plugins/your-plugin-name/`
-3. Copy `plugin.toml` and frontend build to the same directory
+3. Copy `plugin.toml` and frontend build (if any) to the same directory
 4. Restart TimeTracker
 5. Enable your plugin in Settings → Plugins
 
@@ -440,46 +499,6 @@ time-tracker-app.exe
 # macOS/Linux
 RUST_LOG=debug ./time-tracker-app
 ```
-
-## Best Practices
-
-### Versioning
-
-- Use [Semantic Versioning](https://semver.org/)
-- Increment major version for breaking API changes
-- Increment minor version for new features
-- Increment patch version for bug fixes
-
-### Error Handling
-
-Always return proper errors from trait methods:
-
-```rust
-fn initialize(&mut self, api: &dyn PluginAPIInterface) -> Result<(), String> {
-    api.register_schema_extension(...)
-        .map_err(|e| format!("Failed to register schema: {}", e))?;
-    Ok(())
-}
-```
-
-### Resource Management
-
-- Clean up resources in `shutdown`
-- Don't hold references to API after shutdown
-- Use proper error handling for all operations
-
-### Security
-
-- Validate all user input
-- Don't expose sensitive data in frontend components
-- Use parameterized queries for database operations (handled by core app)
-
-### Extension API Best Practices
-
-- Always register schema extensions before model extensions
-- Use foreign keys for referential integrity
-- Add indexes for frequently queried columns
-- Keep extension fields optional when possible for compatibility
 
 ## Examples
 
@@ -584,6 +603,46 @@ export const MyPluginSettings: React.FC = () => {
 };
 ```
 
+## Best Practices
+
+### Versioning
+
+- Use [Semantic Versioning](https://semver.org/)
+- Increment major version for breaking API changes
+- Increment minor version for new features
+- Increment patch version for bug fixes
+
+### Error Handling
+
+Always return proper errors from trait methods:
+
+```rust
+fn initialize(&mut self, api: &dyn PluginAPIInterface) -> Result<(), String> {
+    api.register_schema_extension(...)
+        .map_err(|e| format!("Failed to register schema: {}", e))?;
+    Ok(())
+}
+```
+
+### Resource Management
+
+- Clean up resources in `shutdown`
+- Don't hold references to API after shutdown
+- Use proper error handling for all operations
+
+### Security
+
+- Validate all user input
+- Don't expose sensitive data in frontend components
+- Use parameterized queries for database operations (handled by core app)
+
+### Extension API Best Practices
+
+- Always register schema extensions before model extensions
+- Use foreign keys for referential integrity
+- Add indexes for frequently queried columns
+- Keep extension fields optional when possible for compatibility
+
 ## Contributing
 
 When contributing to this template:
@@ -599,7 +658,7 @@ This template is licensed under the MIT License. See LICENSE file for details.
 
 ## Resources
 
-- [TimeTracker Repository](https://github.com/bthos/time-tracker-app)
+- [TimeTracker Repository](https://github.com/tmtrckr/time-tracker-app)
 - [Rust Plugin Development Guide](https://doc.rust-lang.org/book/)
 - [React Documentation](https://react.dev/)
 - [Tauri Documentation](https://tauri.app/)
@@ -609,4 +668,4 @@ This template is licensed under the MIT License. See LICENSE file for details.
 For issues and questions:
 
 - Open an issue in this repository for template-related questions
-- Open an issue in [TimeTracker](https://github.com/bthos/time-tracker-app) for plugin API questions
+- Open an issue in [TimeTracker](https://github.com/tmtrckr/time-tracker-app) for plugin API questions
